@@ -1,0 +1,82 @@
+from django.db import models
+
+class Product(models.Model):
+    name = models.CharField(max_length=255)
+    price = models.DecimalField(max_digits=8, decimal_places=2)
+    description = models.TextField()
+    image = models.ImageField(upload_to='products/')
+
+class Order(models.Model):
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    products = models.ManyToManyField(Product)
+    total_price = models.DecimalField(max_digits=8, decimal_places=2)
+    status = models.CharField(max_length=255, choices=ORDER_STATUSES)
+
+class Customer(models.Model):
+    name = models.CharField(max_length=255)
+    email = models.EmailField()
+
+from django.shortcuts import render
+from .models import Product, Order
+
+def product_list(request):
+    products = Product.objects.all()
+    return render(request, 'ecommerce/product_list.html', {'products': products})
+
+def product_detail(request, pk):
+    product = get_object_or_404(Product, pk=pk)
+    return render(request, 'ecommerce/product_detail.html', {'product': product})
+
+def order_create(request):
+    cart = request.session.get('cart', {})
+    if request.method == 'POST':
+        form = OrderForm(request.POST)
+        if form.is_valid():
+            order = form.save()
+            for product_id, quantity in cart.items():
+                product = get_object_or_404(Product, pk=product_id)
+                OrderItem.objects.create(order=order, product=product, quantity=quantity)
+            request.session['cart'] = {}
+            return redirect('order_success')
+    else:
+        form = OrderForm()
+    return render(request, 'ecommerce/order_create.html', {'form': form})
+<!-- product_list.html -->
+{% for product in products %}
+    <h2>{{ product.name }}</h2>
+    <p>{{ product.description }}</p>
+    <p>{{ product.price }}</p>
+    <a href="{% url 'product_detail' product.pk %}">View details</a>
+{% endfor %}
+
+<!-- product_detail.html -->
+<h2>{{ product.name }}</h2>
+<p>{{ product.description }}</p>
+<p>{{ product.price }}</p>
+
+<!-- product_detail.html -->
+<div class="product-detail">
+  <img src="{{ product.image.url }}" alt="{{ product.name }}">
+  <h2>{{ product.name }}</h2>
+  <p>{{ product.description }}</p>
+  <p>{{ product.price }}</p>
+</div>
+
+<style>
+.product-detail {
+  text-align: center;
+}
+.product-detail img {
+  width: 80%;
+  height: auto;
+}
+.product-detail h2 {
+  font-size: 1.5em;
+  margin: 1em 0;
+}
+.product-detail p {
+  font-size: 1.2em;
+  margin: 0.5em 0;
+}
+</style>
+
